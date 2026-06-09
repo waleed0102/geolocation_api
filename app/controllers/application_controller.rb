@@ -7,8 +7,7 @@ class ApplicationController < ActionController::API
   private
 
   def authenticate!
-    token = bearer_token
-    return unauthorized_error unless token.present? && ApiKey.active.exists?(token: token)
+    return unauthorized_error unless ApiKey.find_by_token(bearer_token)
   end
 
   def bearer_token

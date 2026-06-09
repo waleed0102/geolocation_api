@@ -76,6 +76,20 @@ RSpec.describe GeolocationProviders::Ipstack do
       end
     end
 
+    context "when the provider returns HTTP 5xx" do
+      before do
+        stub_request(:get, "http://api.ipstack.com/#{ip}")
+          .with(query: { access_key: "test_key" })
+          .to_return(status: 503, body: "Service Unavailable", headers: {})
+      end
+
+      it "returns a failure result with the status code" do
+        result = provider.fetch(ip)
+        expect(result).to be_failure
+        expect(result.error).to include("503")
+      end
+    end
+
     context "when the network is unreachable" do
       before do
         stub_request(:get, "http://api.ipstack.com/#{ip}")
@@ -101,6 +115,14 @@ RSpec.describe GeolocationProviders::Ipstack do
         result = provider.fetch(ip)
         expect(result).to be_failure
         expect(result.error).to include("Invalid response")
+      end
+    end
+
+    context "when IPSTACK_ACCESS_KEY is not set" do
+      before { stub_const("ENV", ENV.to_h.except("IPSTACK_ACCESS_KEY")) }
+
+      it "raises ArgumentError caught by the service" do
+        expect { provider.fetch(ip) }.to raise_error(ArgumentError, /IPSTACK_ACCESS_KEY/)
       end
     end
   end

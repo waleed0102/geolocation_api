@@ -22,6 +22,22 @@ RSpec.describe "Api::V1::Geolocations", type: :request do
         expect(data).to include(:type, :id, :attributes)
         expect(data[:type]).to eq("geolocation")
       end
+
+      it "returns pagination metadata" do
+        get "/api/v1/geolocations", headers: headers
+        expect(json_response[:meta]).to include(total: 2, page: 1, per_page: 25)
+      end
+
+      it "respects per_page parameter" do
+        get "/api/v1/geolocations", params: { per_page: 1 }, headers: headers
+        expect(json_response[:data].length).to eq(1)
+        expect(json_response[:meta][:per_page]).to eq(1)
+      end
+
+      it "caps per_page at 100" do
+        get "/api/v1/geolocations", params: { per_page: 999 }, headers: headers
+        expect(json_response[:meta][:per_page]).to eq(100)
+      end
     end
 
     context "without API key" do
@@ -40,6 +56,23 @@ RSpec.describe "Api::V1::Geolocations", type: :request do
         expect(response).to have_http_status(:unauthorized)
       end
     end
+
+    context "with a malformed Authorization header" do
+      it "returns 401 for wrong scheme" do
+        get "/api/v1/geolocations", headers: { "Authorization" => "Token #{api_key.raw_token}" }
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it "returns 401 when scheme case does not match" do
+        get "/api/v1/geolocations", headers: { "Authorization" => "bearer #{api_key.raw_token}" }
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it "returns 401 when header has no token after Bearer" do
+        get "/api/v1/geolocations", headers: { "Authorization" => "Bearer" }
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
   end
 
   describe "GET /api/v1/geolocations/:ip_address" do
@@ -52,6 +85,23 @@ RSpec.describe "Api::V1::Geolocations", type: :request do
         attrs = json_response[:data][:attributes]
         expect(attrs[:ip_address]).to eq(ip)
         expect(attrs[:country_name]).to eq("United States")
+      end
+    end
+
+    context "with an IPv6 address" do
+      let(:ipv6) { "2001:db8::1" }
+      let!(:ipv6_geo) { create(:geolocation, ip_address: ipv6) }
+
+      it "returns the geolocation" do
+        get "/api/v1/geolocations/#{ipv6}", headers: headers
+        expect(response).to have_http_status(:ok)
+        expect(json_response[:data][:attributes][:ip_address]).to eq(ipv6)
+      end
+
+      it "normalizes equivalent IPv6 representations to the same record" do
+        get "/api/v1/geolocations/2001:0db8:0000:0000:0000:0000:0000:0001", headers: headers
+        expect(response).to have_http_status(:ok)
+        expect(json_response[:data][:attributes][:ip_address]).to eq(ipv6)
       end
     end
 
@@ -116,6 +166,20 @@ RSpec.describe "Api::V1::Geolocations", type: :request do
         attrs = json_response[:data][:attributes]
         expect(attrs[:ip_address]).to eq(resolved_ip)
         expect(attrs[:url]).to eq("http://#{url}")
+      end
+    end
+
+    context "when given a private IP address" do
+      it "returns 422 for loopback" do
+        post "/api/v1/geolocations", params: { ip_or_url: "127.0.0.1" }.to_json, headers: headers
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(json_response[:errors].first[:detail]).to include("Private and reserved IP")
+      end
+
+      it "returns 422 for RFC-1918 addresses" do
+        post "/api/v1/geolocations", params: { ip_or_url: "192.168.1.1" }.to_json, headers: headers
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(json_response[:errors].first[:detail]).to include("Private and reserved IP")
       end
     end
 

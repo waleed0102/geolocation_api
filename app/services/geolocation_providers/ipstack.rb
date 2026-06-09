@@ -7,6 +7,11 @@ module GeolocationProviders
 
     def fetch(ip_address)
       response = connection.get("/#{ip_address}", access_key: api_key)
+
+      unless response.success?
+        return Result.failure("Provider returned HTTP #{response.status}")
+      end
+
       data = JSON.parse(response.body)
 
       if data["success"] == false
@@ -33,7 +38,8 @@ module GeolocationProviders
     end
 
     def api_key
-      ENV.fetch("IPSTACK_ACCESS_KEY") { raise "IPSTACK_ACCESS_KEY environment variable is not set" }
+      ENV["IPSTACK_ACCESS_KEY"].presence ||
+        raise(ArgumentError, "IPSTACK_ACCESS_KEY environment variable is not set")
     end
 
     def map_response(data)

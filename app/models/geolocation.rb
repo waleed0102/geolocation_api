@@ -1,10 +1,16 @@
 class Geolocation < ApplicationRecord
+  before_validation :normalize_ip_address, if: -> { ip_address.present? }
+
   validates :ip_address, presence: true, uniqueness: { case_sensitive: false }
   validate :ip_address_format, if: -> { ip_address.present? }
 
-  scope :active, -> { all }
-
   private
+
+  def normalize_ip_address
+    self.ip_address = IPAddr.new(ip_address).to_s
+  rescue IPAddr::InvalidAddressError, IPAddr::AddressFamilyError
+    nil # leave as-is; ip_address_format validation will catch it
+  end
 
   def ip_address_format
     IPAddr.new(ip_address)

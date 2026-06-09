@@ -6,6 +6,16 @@ class GeolocationLookupService
   # Swap this constant to change the geolocation provider globally.
   PROVIDER_CLASS = GeolocationProviders::Ipstack
 
+  PRIVATE_RANGES = [
+    IPAddr.new("10.0.0.0/8"),
+    IPAddr.new("172.16.0.0/12"),
+    IPAddr.new("192.168.0.0/16"),
+    IPAddr.new("127.0.0.0/8"),
+    IPAddr.new("169.254.0.0/16"),
+    IPAddr.new("::1/128"),
+    IPAddr.new("fc00::/7")
+  ].freeze
+
   ServiceResult = Struct.new(:geolocation, :error, keyword_init: true) do
     def success? = error.nil?
     def failure? = !success?
@@ -17,6 +27,7 @@ class GeolocationLookupService
 
   def call(ip_or_url)
     ip_address = resolve_ip(ip_or_url)
+    validate_public_ip!(ip_address)
     original_url = url_input?(ip_or_url) ? normalize_url(ip_or_url) : nil
 
     existing = Geolocation.find_by(ip_address: ip_address)
@@ -30,6 +41,9 @@ class GeolocationLookupService
     )
 
     ServiceResult.new(geolocation: geolocation)
+  rescue ActiveRecord::RecordNotUnique
+    # Lost a concurrent-insert race — return whichever record won
+    ServiceResult.new(geolocation: Geolocation.find_by!(ip_address: ip_address))
   rescue ArgumentError => e
     ServiceResult.new(error: e.message)
   rescue ActiveRecord::RecordInvalid => e
@@ -49,6 +63,13 @@ class GeolocationLookupService
     Resolv.getaddress(hostname)
   rescue Resolv::ResolvError
     raise ArgumentError, "Cannot resolve hostname: #{extract_hostname(input)}"
+  end
+
+  def validate_public_ip!(ip_string)
+    addr = IPAddr.new(ip_string)
+    if PRIVATE_RANGES.any? { |range| range.include?(addr) }
+      raise ArgumentError, "Private and reserved IP addresses are not supported"
+    end
   end
 
   def ip_address?(input)

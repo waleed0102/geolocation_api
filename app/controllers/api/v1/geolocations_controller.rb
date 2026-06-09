@@ -2,8 +2,17 @@ module Api
   module V1
     class GeolocationsController < ApplicationController
       def index
+        page     = [params.fetch(:page, 1).to_i, 1].max
+        per_page = [[params.fetch(:per_page, 25).to_i, 1].max, 100].min
+
         geolocations = Geolocation.order(created_at: :desc)
-        render json: GeolocationSerializer.new(geolocations).serializable_hash
+                                  .limit(per_page)
+                                  .offset((page - 1) * per_page)
+        total = Geolocation.count
+
+        render json: GeolocationSerializer.new(geolocations)
+                                          .serializable_hash
+                                          .merge(meta: { total: total, page: page, per_page: per_page })
       end
 
       def show
@@ -32,7 +41,12 @@ module Api
       private
 
       def find_geolocation
-        Geolocation.find_by!(ip_address: params[:ip_address])
+        ip = begin
+          IPAddr.new(params[:ip_address]).to_s
+        rescue IPAddr::InvalidAddressError, IPAddr::AddressFamilyError
+          params[:ip_address]
+        end
+        Geolocation.find_by!(ip_address: ip)
       end
     end
   end

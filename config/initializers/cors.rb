@@ -1,9 +1,14 @@
 Rails.application.config.middleware.insert_before 0, Rack::Cors do
-  allow do
-    origins ENV.fetch("CORS_ORIGINS", "*")
+  allowed_origins = if Rails.env.development?
+    ["*"]
+  else
+    ENV.fetch("CORS_ORIGINS", "").split(",").map(&:strip).reject(&:empty?)
+  end
 
-    resource "*",
-      headers: :any,
-      methods: %i[get post delete options head]
+  unless allowed_origins.empty?
+    allow do
+      origins(*allowed_origins)
+      resource "*", headers: :any, methods: %i[get post delete options head]
+    end
   end
 end

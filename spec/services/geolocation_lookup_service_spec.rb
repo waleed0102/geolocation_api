@@ -79,6 +79,45 @@ RSpec.describe GeolocationLookupService do
       end
     end
 
+    context "when given a private IP address" do
+      it "rejects loopback addresses" do
+        result = described_class.call("127.0.0.1")
+        expect(result).to be_failure
+        expect(result.error).to include("Private and reserved IP")
+      end
+
+      it "rejects RFC-1918 addresses" do
+        result = described_class.call("192.168.1.1")
+        expect(result).to be_failure
+        expect(result.error).to include("Private and reserved IP")
+      end
+
+      it "rejects link-local addresses" do
+        result = described_class.call("169.254.1.1")
+        expect(result).to be_failure
+        expect(result.error).to include("Private and reserved IP")
+      end
+    end
+
+    context "when a concurrent insert causes RecordNotUnique" do
+      let!(:concurrent_record) { create(:geolocation, ip_address: ip) }
+
+      before do
+        allow(mock_provider).to receive(:fetch).with(ip)
+          .and_return(GeolocationProviders::Result.success(provider_data))
+        # Simulate: initial find_by sees nothing (race begins), create! hits unique constraint
+        allow(Geolocation).to receive(:find_by).with(ip_address: ip).and_return(nil)
+        allow(Geolocation).to receive(:create!).and_raise(ActiveRecord::RecordNotUnique)
+        allow(Geolocation).to receive(:find_by!).with(ip_address: ip).and_return(concurrent_record)
+      end
+
+      it "returns the concurrently-inserted record without raising" do
+        result = described_class.call(ip)
+        expect(result).to be_success
+        expect(result.geolocation).to eq(concurrent_record)
+      end
+    end
+
     context "when the provider fails" do
       before do
         allow(mock_provider).to receive(:fetch).with(ip)

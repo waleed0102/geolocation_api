@@ -4,7 +4,7 @@ module RequestHelpers
   end
 
   def auth_headers(api_key)
-    { "Authorization" => "Bearer #{api_key.token}", "Content-Type" => "application/json" }
+    { "Authorization" => "Bearer #{api_key.raw_token}", "Content-Type" => "application/json" }
   end
 
   def ipstack_stub(ip:, status: 200, body: nil)
