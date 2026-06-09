@@ -7,7 +7,7 @@ class ApplicationController < ActionController::API
   private
 
   def authenticate!
-    return unauthorized_error unless ApiKey.find_by_token(bearer_token)
+    unauthorized_error unless ApiKey.find_by_token(bearer_token)
   end
 
   def bearer_token
@@ -28,7 +28,7 @@ class ApplicationController < ActionController::API
 
   def render_error(status, title, detail)
     render json: {
-      errors: [{ status: status.to_s, title: title, detail: detail }]
+      errors: [ { status: status.to_s, title: title, detail: detail } ]
     }, status: status
   end
 end

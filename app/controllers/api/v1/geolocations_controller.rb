@@ -2,8 +2,8 @@ module Api
   module V1
     class GeolocationsController < ApplicationController
       def index
-        page     = [params.fetch(:page, 1).to_i, 1].max
-        per_page = [[params.fetch(:per_page, 25).to_i, 1].max, 100].min
+        page     = [ params.fetch(:page, 1).to_i, 1 ].max
+        per_page = [ [ params.fetch(:per_page, 25).to_i, 1 ].max, 100 ].min
 
         geolocations = Geolocation.order(created_at: :desc)
                                   .limit(per_page)
