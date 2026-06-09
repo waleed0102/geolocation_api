@@ -1,0 +1,13 @@
+.env
+*.log
+/tmp
+/log
+/.bundle
+/vendor/bundle
+/public/packs
+/public/assets
+/storage
+/node_modules
+.byebug_history
+config/master.key
+config/credentials/*.key
