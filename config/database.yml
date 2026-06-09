@@ -1,0 +1,34 @@
+# PostgreSQL. Versions 9.5 and up are supported.
+#
+# Install the pg driver:
+#   gem install pg
+# On macOS with Homebrew:
+#   gem install pg -- --with-pg-config=/opt/homebrew/bin/pg_config
+# On Windows:
+#   gem install pg
+#       Choose the win32 build.
+#       Install PostgreSQL and put its /bin directory on your path.
+#
+# Configure Using Gemfile
+# gem "pg"
+#
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  url: <%= ENV["DATABASE_URL"] %>
+
+development:
+  <<: *default
+  database: geolocation_api_development
+
+test:
+  <<: *default
+  database: geolocation_api_test
+
+production:
+  <<: *default
+  database: geolocation_api_production
+  username: <%= ENV["DB_USERNAME"] %>
+  password: <%= ENV["DB_PASSWORD"] %>
+  host: <%= ENV["DB_HOST"] %>
